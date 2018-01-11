@@ -1,0 +1,107 @@
+#! /bin/bash
+
+eval "$(docopts -V - -h - : "$@" <<EOF
+Usage:
+	aws-instance list
+	aws-instance create <name>
+	aws-instance start <name>
+	aws-instance ssh <name>
+	aws-instance stop <name>
+	aws-instance get_state <name>
+
+Options:
+	-h --help  Show help options.
+----
+EOF
+)"
+
+get_image_id() {
+	echo $(get_instance_metadata | jq --raw-output '.Reservations[0].Instances[0].ImageId')
+}
+
+get_image_metadata() {
+  echo $(aws --profile home ec2 describe-images --image-ids $(get_image_id))
+}
+
+get_user() {
+	image_name=$(get_image_metadata | jq '.Images[0].Name')
+
+	if echo $image_name | grep debian > /dev/null 2>&1; then
+		echo admin
+	elif echo $image_name | grep ubuntu > /dev/null 2>&1; then
+		echo ubuntu
+	fi
+}
+
+metadata=$(aws --profile home ec2 describe-instances --filters "Name=tag:Name,Values=$name")
+
+get_instance_metadata() {
+	echo $metadata
+}
+
+get_instance_id() {
+	get_instance_metadata | jq --raw-output '.Reservations[0].Instances[0].InstanceId'
+}
+
+do_create() {
+	echo 'create'
+}
+
+do_start() {
+	start_instance $(get_instance_id)
+}
+
+start_instance() {
+	local instance_id=$1
+	aws --profile home ec2 start-instances --instance-ids $instance_id
+}
+
+do_ssh() {
+	num_instances=$(get_instance_metadata | jq '.Reservations | length')
+	if [[ $num_instances -eq 0 ]]; then
+		echo no instance named $name found
+	else
+		instance_id=$(get_instance_metadata | jq --raw-output '.Reservations[0].Instances[0].InstanceId')
+		state=$(get_instance_metadata | jq --raw-output '.Reservations[0].Instances[0].State.Name')
+		if [[ $state != 'running' ]]; then
+			echo "instance $name isn't running"
+		else
+			ip=$(get_instance_metadata | jq --raw-output '.Reservations[0].Instances[0].PublicIpAddress')
+      ssh -i ~/.ssh/aws_ec2_instance.pem $(get_user)@${ip}
+		fi
+	fi
+}
+
+do_stop() {
+	instance_id=$(get_instance_metadata | jq --raw-output '.Reservations[0].Instances[0].InstanceId')
+
+	aws --profile home ec2 stop-instances --instance-ids $instance_id
+}
+
+do_get_state() {
+	state=$(get_instance_metadata | jq --raw-output '.Reservations[0].Instances[0].State.Name')
+
+	echo $state
+}
+
+do_list() {
+	aws --profile home ec2 describe-instances | jq --raw-output '.Reservations[].Instances[0].Tags[].Value'
+}
+
+main() {
+	if $create; then
+		do_create
+	elif $list; then
+		do_list
+	elif $start; then
+		do_start
+	elif $ssh; then
+		do_ssh
+	elif $stop; then
+		do_stop
+	elif $get_state; then
+		do_get_state
+	fi
+}
+
+main
