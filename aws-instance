@@ -5,7 +5,7 @@ Usage:
 	aws-instance list
 	aws-instance create <name>
 	aws-instance start <name>
-	aws-instance ssh <name>
+	aws-instance ssh <name> -- [<sshopt>...]
 	aws-instance stop <name>
 	aws-instance get_state <name>
 
@@ -67,7 +67,7 @@ do_ssh() {
 			echo "instance $name isn't running"
 		else
 			ip=$(get_instance_metadata | jq --raw-output '.Reservations[0].Instances[0].PublicIpAddress')
-      ssh -i ~/.ssh/aws_ec2_instance.pem $(get_user)@${ip}
+      ssh -i ~/.ssh/aws_ec2_instance.pem $(get_user)@${ip} $sshopt
 		fi
 	fi
 }
