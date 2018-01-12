@@ -5,7 +5,7 @@ Usage:
 	aws-instance list
 	aws-instance create <name>
 	aws-instance start <name>
-	aws-instance ssh <name> -- [<sshopt>...]
+	aws-instance ssh <name> [-- <sshopt>...]
 	aws-instance stop <name>
 	aws-instance get_state <name>
 
